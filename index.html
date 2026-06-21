@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Query Console — SQL Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<style>
+  :root{
+    --bg:#13101c; --surface:#1c1626; --surface-2:#251d33; --surface-3:#2e2540;
+    --ink:#ECE7F2; --muted:#988cab; --faint:#6c6280;
+    --teal:#39d3bb; --teal-dim:#1f8f80; --amber:#f5b454; --plum:#b07ee8; --err:#ff7d92;
+    --line:rgba(255,255,255,.085); --line-strong:rgba(255,255,255,.16);
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1100px 600px at 85% -10%, rgba(176,126,232,.10), transparent 60%),
+      radial-gradient(900px 500px at -5% 110%, rgba(57,211,187,.08), transparent 55%),
+      var(--bg);
+    color:var(--ink); font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; min-height:100vh;
+  }
+  a{color:var(--teal)}
+
+  header.top{
+    position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px;
+    padding:14px clamp(16px,3vw,34px);background:rgba(19,16,28,.82);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+  .brand .mark{
+    font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:-.5px;
+    color:var(--bg);background:var(--teal);padding:4px 9px;border-radius:6px;line-height:1;white-space:nowrap;
+  }
+  .brand h1{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px;margin:0;letter-spacing:-.2px;white-space:nowrap}
+  .brand .sub{color:var(--muted);font-size:12.5px;font-family:var(--mono)}
+  .prog-wrap{margin-left:auto;display:flex;align-items:center;gap:12px;min-width:170px}
+  .prog-label{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
+  .prog-track{flex:1;height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden;min-width:80px}
+  .prog-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--teal-dim),var(--teal));transition:width .5s cubic-bezier(.4,0,.2,1)}
+
+  /* tab bar */
+  .tabs{
+    display:flex;gap:6px;padding:0 clamp(16px,3vw,34px);
+    border-bottom:1px solid var(--line);background:rgba(19,16,28,.55);
+    position:sticky;top:61px;z-index:19;backdrop-filter:blur(10px);
+  }
+  .tab{
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;
+    color:var(--muted);background:none;border:0;cursor:pointer;
+    padding:13px 16px 12px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:8px;
+    transition:color .15s;
+  }
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--ink);border-bottom-color:var(--teal)}
+  .tab .pill{font-family:var(--mono);font-size:10.5px;color:var(--faint);background:var(--surface-2);border:1px solid var(--line);padding:1px 7px;border-radius:99px}
+  .tab.active .pill{color:var(--teal);border-color:rgba(57,211,187,.4)}
+
+  .shell{display:grid;grid-template-columns:248px 1fr;max-width:1320px;margin:0 auto}
+
+  nav.spine{
+    border-right:1px solid var(--line);padding:22px 14px 60px;
+    position:sticky;top:111px;align-self:start;height:calc(100vh - 111px);overflow:auto;
+  }
+  .spine .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--faint);padding:0 8px 12px}
+  .node{
+    display:grid;grid-template-columns:30px 1fr;align-items:center;gap:10px;
+    padding:9px 8px;border-radius:9px;cursor:pointer;position:relative;
+    color:var(--muted);transition:background .15s,color .15s;
+  }
+  .node:hover{background:var(--surface)}
+  .node .dot{
+    width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+    font-family:var(--mono);font-size:12px;font-weight:700;
+    background:var(--surface-2);border:1px solid var(--line);color:var(--muted);transition:all .2s;
+  }
+  .node .nm{font-size:13px;font-weight:500;line-height:1.2}
+  .node .tag{font-family:var(--mono);font-size:10px;color:var(--faint);display:block;margin-top:1px}
+  .node.active{background:var(--surface)}
+  .node.active .nm{color:var(--ink)}
+  .node.active .dot{border-color:var(--plum);color:var(--plum);box-shadow:0 0 0 3px rgba(176,126,232,.12)}
+  .node.done .dot{background:var(--teal);border-color:var(--teal);color:var(--bg)}
+  .node.done .nm{color:var(--ink)}
+
+  main{padding:30px clamp(18px,3vw,40px) 80px;min-width:0}
+  .lesson-head .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--plum);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .lesson-head h2{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(24px,4vw,33px);margin:0 0 14px;letter-spacing:-.7px;line-height:1.05}
+  .concept{font-size:15px;line-height:1.62;color:#d8d0e4;max-width:66ch}
+  .concept code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:2px 6px;border-radius:5px;color:var(--teal);border:1px solid var(--line)}
+  .concept strong{color:var(--ink);font-weight:600}
+
+  .task{margin:22px 0 8px;padding:16px 18px;border-radius:12px;background:linear-gradient(180deg,var(--surface),var(--surface-2));border:1px solid var(--line);border-left:3px solid var(--amber)}
+  .task .lab{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--amber);margin-bottom:6px}
+  .task p{margin:0;font-size:15px;line-height:1.55;color:#e7e1f0}
+
+  .schema{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:20px 0 0}
+  .schema .tname{font-family:var(--mono);font-size:12px;color:var(--muted);margin-right:4px}
+  .schema .tname b{color:var(--amber);font-weight:700}
+  .col{font-family:var(--mono);font-size:11.5px;padding:4px 9px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);color:#cdc4dd;white-space:nowrap}
+  .col .ty{color:var(--faint);margin-left:5px;font-size:10.5px}
+  .schema + .schema{margin-top:10px}
+
+  .console{margin-top:16px;border:1px solid var(--line-strong);border-radius:14px;overflow:hidden;background:#0f0c17;box-shadow:0 24px 60px -30px rgba(0,0,0,.8)}
+  .console-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--line)}
+  .console-bar .lights{display:flex;gap:6px;margin-right:4px}
+  .console-bar .lights i{width:11px;height:11px;border-radius:50%;display:block}
+  .l1{background:#ff5f57}.l2{background:#febc2e}.l3{background:#28c840}
+  .console-bar .file{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .console-bar .kbd{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .console-bar .kbd b{color:var(--muted);background:var(--surface-3);border:1px solid var(--line);padding:1px 5px;border-radius:4px;font-weight:500}
+
+  textarea#editor{
+    width:100%;min-height:138px;resize:vertical;display:block;background:transparent;color:#f3eefa;
+    border:0;outline:0;font-family:var(--mono);font-size:14.5px;line-height:1.6;padding:16px;tab-size:2;caret-color:var(--teal);
+  }
+  textarea#editor::placeholder{color:var(--faint)}
+
+  .run-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface)}
+  button{font-family:'Space Grotesk',sans-serif;cursor:pointer;border:0;border-radius:9px;font-weight:600;transition:transform .08s,filter .15s,background .15s}
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .btn-run{background:var(--surface-3);color:var(--ink);padding:9px 16px;font-size:13.5px;border:1px solid var(--line-strong)}
+  .btn-run:hover:not(:disabled){background:#372c4d}
+  .btn-check{background:var(--teal);color:#06231f;padding:9px 18px;font-size:13.5px}
+  .btn-check:hover:not(:disabled){filter:brightness(1.07)}
+  .btn-ghost{background:transparent;color:var(--muted);padding:9px 12px;font-size:13px}
+  .btn-ghost:hover{color:var(--ink)}
+  .run-bar .spacer{margin-left:auto}
+
+  .out{margin-top:16px}
+  .status{font-family:var(--mono);font-size:13px;padding:11px 15px;border-radius:10px;display:flex;align-items:flex-start;gap:9px;line-height:1.5}
+  .status.idle{background:var(--surface);color:var(--muted);border:1px solid var(--line)}
+  .status.ok{background:rgba(57,211,187,.10);color:#7ef0df;border:1px solid rgba(57,211,187,.35)}
+  .status.err{background:rgba(255,125,146,.09);color:#ffb0bd;border:1px solid rgba(255,125,146,.32)}
+  .status.warn{background:rgba(245,180,84,.09);color:#ffd089;border:1px solid rgba(245,180,84,.3)}
+  .status .ic{font-weight:700;flex:none}
+
+  .grid-scroll{margin-top:12px;overflow:auto;border:1px solid var(--line);border-radius:11px;max-height:360px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th{position:sticky;top:0;background:var(--surface-2);color:var(--amber);font-family:var(--mono);font-weight:700;font-size:11.5px;letter-spacing:.4px;text-align:left;padding:9px 14px;border-bottom:1px solid var(--line-strong);white-space:nowrap}
+  td{padding:8px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);color:#dcd4e8;white-space:nowrap}
+  tbody tr:nth-child(even){background:rgba(255,255,255,.018)}
+  td.num{color:var(--teal)}
+  .rowfade{animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .pulse{animation:pulse .6s ease}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(57,211,187,.5)}100%{box-shadow:0 0 0 14px rgba(57,211,187,0)}}
+
+  .footnav{display:flex;justify-content:space-between;margin-top:24px;gap:12px}
+  .footnav button{background:var(--surface-2);color:var(--ink);border:1px solid var(--line);padding:10px 18px;font-size:13.5px}
+  .footnav button:hover:not(:disabled){background:var(--surface-3)}
+
+  .boot{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--bg);font-family:var(--mono);color:var(--muted)}
+  .boot .blink{color:var(--teal)}
+  .boot.hide{display:none}
+
+  @media(max-width:860px){
+    .shell{grid-template-columns:1fr}
+    nav.spine{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);display:flex;gap:8px;overflow-x:auto;padding:12px}
+    .spine .eyebrow{display:none}
+    .node{grid-template-columns:auto;flex:none;min-width:54px;justify-items:center;text-align:center}
+    .node .nm,.node .tag{display:none}
+    .prog-wrap{min-width:130px}
+    .brand h1{display:none}
+    .tab{padding:11px 11px}
+    .tab .pill{display:none}
+  }
+  ::-webkit-scrollbar{height:10px;width:10px}
+  ::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:8px}
+</style>
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div style="text-align:center">booting query engine<span class="blink">…</span><br><span style="font-size:11px">loading SQLite (WebAssembly)</span></div>
+</div>
+
+<header class="top">
+  <div class="brand">
+    <span class="mark">SELECT *</span>
+    <h1>Query Console</h1>
+    <span class="sub">live sql trainer</span>
+  </div>
+  <div class="prog-wrap">
+    <span class="prog-label" id="progText">0 / 9</span>
+    <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+  </div>
+</header>
+
+<div class="tabs" id="tabs"></div>
+
+<div class="shell">
+  <nav class="spine" id="spine"><div class="eyebrow">Lessons</div></nav>
+
+  <main>
+    <div class="lesson-head">
+      <div class="eyebrow" id="lEyebrow"></div>
+      <h2 id="lTitle"></h2>
+      <div class="concept" id="lConcept"></div>
+    </div>
+
+    <div class="task">
+      <div class="lab">Your task</div>
+      <p id="lTask"></p>
+    </div>
+
+    <div id="schemaHost"></div>
+
+    <div class="console">
+      <div class="console-bar">
+        <span class="lights"><i class="l1"></i><i class="l2"></i><i class="l3"></i></span>
+        <span class="file">training.db</span>
+        <span class="kbd"><b>Ctrl</b>/<b>⌘</b> + <b>Enter</b> to run</span>
+      </div>
+      <textarea id="editor" spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+      <div class="run-bar">
+        <button class="btn-run" id="runBtn">▷ Run</button>
+        <button class="btn-check" id="checkBtn">✓ Check answer</button>
+        <span class="spacer"></span>
+        <button class="btn-ghost" id="solBtn">Show solution</button>
+        <button class="btn-ghost" id="resetBtn">Reset</button>
+      </div>
+    </div>
+
+    <div class="out">
+      <div class="status idle" id="status"><span class="ic">›</span><span id="statusText">Write a query and Run it, or hit Check to grade the task. Errors are normal — read the message and adjust.</span></div>
+      <div id="gridHost"></div>
+    </div>
+
+    <div class="footnav">
+      <button id="prevBtn">← Previous</button>
+      <button id="nextBtn">Next →</button>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ================= seed data ================= */
+const SEED = `
+CREATE TABLE titles(
+  id INTEGER PRIMARY KEY, title TEXT, type TEXT, genre TEXT,
+  release_year INTEGER, maturity_rating TEXT, imdb_score REAL,
+  views_millions INTEGER, country TEXT
+);
+INSERT INTO titles VALUES
+(1,'Stranger Things','Series','Sci-Fi',2016,'TV-14',8.7,582,'USA'),
+(2,'The Crown','Series','Drama',2016,'TV-MA',8.6,73,'UK'),
+(3,'Wednesday','Series','Comedy',2022,'TV-14',8.1,252,'USA'),
+(4,'Money Heist','Series','Crime',2017,'TV-MA',8.2,190,'Spain'),
+(5,'The Witcher','Series','Fantasy',2019,'TV-MA',8.0,76,'USA'),
+(6,'Squid Game','Series','Thriller',2021,'TV-MA',8.0,265,'South Korea'),
+(7,'Glass Onion','Movie','Mystery',2022,'PG-13',7.1,209,'USA'),
+(8,'Red Notice','Movie','Action',2021,'PG-13',6.3,230,'USA'),
+(9,'Don''t Look Up','Movie','Comedy',2021,'R',7.2,171,'USA'),
+(10,'The Gray Man','Movie','Action',2022,'PG-13',6.5,139,'USA'),
+(11,'Extraction','Movie','Action',2020,'R',6.7,99,'USA'),
+(12,'Bird Box','Movie','Thriller',2018,'R',6.6,89,'USA'),
+(13,'Lupin','Series','Crime',2021,'TV-MA',7.5,76,'France'),
+(14,'Dark','Series','Sci-Fi',2017,'TV-MA',8.7,45,'Germany'),
+(15,'Narcos','Series','Crime',2015,'TV-MA',8.8,65,'Colombia'),
+(16,'Roma','Movie','Drama',2018,'R',7.7,22,'Mexico');
+
+CREATE TABLE plays(
+  id INTEGER PRIMARY KEY, title_id INTEGER, played_on TEXT, country TEXT,
+  minutes_watched INTEGER, device TEXT, completed INTEGER
+);
+INSERT INTO plays VALUES
+(1,1,'2024-01-05','USA',48,'TV',1),
+(2,1,'2024-01-05','USA',52,'Mobile',1),
+(3,6,'2024-01-06','South Korea',61,'TV',1),
+(4,6,'2024-01-06','USA',55,'Laptop',1),
+(5,3,'2024-01-07','USA',45,'Mobile',1),
+(6,8,'2024-01-08','USA',118,'TV',1),
+(7,8,'2024-01-09','UK',40,'Tablet',0),
+(8,4,'2024-02-02','Spain',50,'TV',1),
+(9,4,'2024-02-03','Spain',47,'Mobile',1),
+(10,7,'2024-02-10','USA',139,'TV',1),
+(11,7,'2024-02-11','USA',60,'Laptop',0),
+(12,2,'2024-02-14','UK',58,NULL,1),
+(13,5,'2024-02-20','USA',NULL,'Mobile',0),
+(14,9,'2024-03-01','USA',132,'TV',1),
+(15,10,'2024-03-03','USA',122,'TV',1),
+(16,11,'2024-03-05','USA',116,'Laptop',1),
+(17,12,'2024-03-09','UK',124,'TV',1),
+(18,13,'2024-03-12','France',44,'Mobile',1),
+(19,14,'2024-03-15','Germany',60,'TV',1),
+(20,15,'2024-03-18','Colombia',52,NULL,1),
+(21,16,'2024-03-22','Mexico',135,'TV',1),
+(22,1,'2024-04-01','USA',49,'TV',1),
+(23,6,'2024-04-02','USA',58,'Mobile',1),
+(24,3,'2024-04-04','USA',47,'Tablet',1),
+(25,8,'2024-04-05','USA',NULL,'TV',0),
+(26,7,'2024-04-08','UK',141,'Laptop',1),
+(27,4,'2024-04-12','Spain',49,'TV',0),
+(28,2,'2024-04-20','UK',55,'Mobile',1);
+
+CREATE TABLE members(
+  member_id INTEGER PRIMARY KEY, signup_date TEXT, service TEXT, country TEXT,
+  plan TEXT, monthly_price REAL, cancel_date TEXT
+);
+INSERT INTO members VALUES
+(1,'2024-01-03','Netflix','USA','Premium',22.99,NULL),
+(2,'2024-01-05','Netflix','USA','Standard',15.49,'2024-03-10'),
+(3,'2024-01-08','Spotify','USA','Premium',11.99,NULL),
+(4,'2024-01-12','Disney+','UK','Standard',10.99,'2024-02-20'),
+(5,'2024-01-15','Max','USA','Ads',9.99,NULL),
+(6,'2024-01-20','Netflix','Brazil','Basic',6.99,'2024-04-01'),
+(7,'2024-01-22','Xbox','USA','Premium',16.99,NULL),
+(8,'2024-01-28','Spotify','Germany','Premium',11.99,'2024-02-15'),
+(9,'2024-02-02','Netflix','USA','Premium',22.99,NULL),
+(10,'2024-02-05','Disney+','USA','Standard',10.99,NULL),
+(11,'2024-02-09','Spotify','Mexico','Premium',9.99,'2024-04-12'),
+(12,'2024-02-14','Max','USA','Standard',16.99,NULL),
+(13,'2024-02-18','Netflix','France','Standard',15.49,'2024-03-25'),
+(14,'2024-02-21','Xbox','UK','Premium',16.99,NULL),
+(15,'2024-02-25','Spotify','USA','Basic',5.99,NULL),
+(16,'2024-02-28','Netflix','USA','Ads',6.99,'2024-03-30'),
+(17,'2024-03-03','Netflix','USA','Premium',22.99,NULL),
+(18,'2024-03-06','Disney+','Canada','Standard',10.99,NULL),
+(19,'2024-03-10','Spotify','USA','Premium',11.99,NULL),
+(20,'2024-03-14','Max','Germany','Ads',9.99,'2024-04-20'),
+(21,'2024-03-19','Netflix','USA','Standard',15.49,NULL),
+(22,'2024-03-23','Xbox','USA','Premium',16.99,NULL),
+(23,'2024-03-27','Spotify','Brazil','Premium',8.99,NULL),
+(24,'2024-03-30','Netflix','UK','Premium',22.99,NULL);
+
+CREATE TABLE streams(
+  stream_id INTEGER PRIMARY KEY, member_id INTEGER, stream_date TEXT, company TEXT,
+  medium TEXT, item TEXT, minutes INTEGER, completed INTEGER
+);
+INSERT INTO streams VALUES
+(1,1,'2024-04-01','Netflix','Series','Stranger Things',50,1),
+(2,9,'2024-04-01','Netflix','Film','Glass Onion',110,1),
+(3,1,'2024-04-02','Netflix','Series','Stranger Things',45,1),
+(4,1,'2024-04-03','Netflix','Series','Wednesday',60,1),
+(5,17,'2024-04-03','Netflix','Series','The Crown',48,0),
+(6,9,'2024-04-04','Netflix','Series','Dark',52,1),
+(7,1,'2024-04-05','Netflix','Film','Red Notice',120,1),
+(8,21,'2024-04-05','Netflix','Series','Lupin',40,1),
+(9,1,'2024-04-06','Netflix','Series','Narcos',55,1),
+(10,24,'2024-04-06','Netflix','Film','The Gray Man',130,1),
+(11,17,'2024-04-07','Netflix','Series','Money Heist',47,0),
+(12,3,'2024-04-01','Spotify','Music','Daily Mix',30,1),
+(13,3,'2024-04-02','Spotify','Music','Discover Weekly',35,1),
+(14,3,'2024-04-03','Spotify','Music','Top Hits',28,0),
+(15,19,'2024-04-02','Spotify','Music','Rap Caviar',40,1),
+(16,23,'2024-04-05','Spotify','Music','Sertanejo',33,1),
+(17,10,'2024-04-01','Disney+','Series','The Mandalorian',44,1),
+(18,18,'2024-04-03','Disney+','Film','Encanto',95,1),
+(19,10,'2024-04-04','Disney+','Series','Loki',41,1),
+(20,7,'2024-04-02','Xbox','Game','Halo Infinite',140,0),
+(21,14,'2024-04-03','Xbox','Game','Forza',88,1),
+(22,22,'2024-04-06','Xbox','Game','Starfield',150,0),
+(23,7,'2024-04-05','Xbox','Game','Call of Duty',132,1),
+(24,5,'2024-04-01','Max','Series','The Last of Us',47,1),
+(25,12,'2024-04-04','Max','Film','Dune',118,1),
+(26,5,'2024-04-06','Max','Series','House of the Dragon',52,1);
+
+CREATE TABLE experiments(
+  assignment_id INTEGER PRIMARY KEY, member_id INTEGER, test_name TEXT, cell TEXT,
+  converted INTEGER, play_delay_ms INTEGER, retained INTEGER
+);
+INSERT INTO experiments VALUES
+(1,1,'faster_start','control',0,2300,0),
+(2,9,'faster_start','control',1,2100,1),
+(3,5,'faster_start','control',0,2500,0),
+(4,12,'faster_start','control',1,2200,1),
+(5,17,'faster_start','control',0,2400,0),
+(6,21,'faster_start','control',1,2000,1),
+(7,3,'faster_start','treatment',1,1200,1),
+(8,7,'faster_start','treatment',1,1100,1),
+(9,10,'faster_start','treatment',0,1300,1),
+(10,14,'faster_start','treatment',1,1000,1),
+(11,18,'faster_start','treatment',1,1400,0),
+(12,22,'faster_start','treatment',1,1150,1),
+(13,2,'artwork_v2','control',0,1800,0),
+(14,4,'artwork_v2','control',1,1700,1),
+(15,6,'artwork_v2','control',0,1900,0),
+(16,8,'artwork_v2','control',1,1750,1),
+(17,11,'artwork_v2','treatment',1,1600,1),
+(18,13,'artwork_v2','treatment',1,1650,1),
+(19,15,'artwork_v2','treatment',0,1550,0),
+(20,16,'artwork_v2','treatment',1,1620,1);
+`;
+
+/* ================= lessons ================= */
+const BASIC = [
+  { tag:'SELECT', emoji:'🔦', title:'SELECT columns',
+    concept:`<code>SELECT</code> is how you ask for data. You name the columns you want, then say which table they live in with <code>FROM</code>. Every query ends in a semicolon.<br><br>The shape is always <strong>SELECT &lt;columns&gt; FROM &lt;table&gt;;</strong> — and <code>SELECT *</code> grabs every column.`,
+    task:`Return the <code>title</code> and <code>imdb_score</code> for every row in the titles table.`,
+    starter:`SELECT title, imdb_score\nFROM titles;`,
+    solution:`SELECT title, imdb_score FROM titles;`, order:false },
+  { tag:'DISTINCT', emoji:'✨', title:'SELECT DISTINCT',
+    concept:`Sometimes a column repeats the same values over and over. <code>SELECT DISTINCT</code> collapses those down to the unique set — useful for answering "what categories even exist here?"`,
+    task:`Return the <strong>distinct</strong> list of <code>genre</code> values in the table (no duplicates).`,
+    starter:`SELECT DISTINCT genre\nFROM titles;`,
+    solution:`SELECT DISTINCT genre FROM titles;`, order:false },
+  { tag:'WHERE', emoji:'📍', title:'SQL WHERE',
+    concept:`<code>WHERE</code> filters rows to only the ones that match a condition. Text values go in <strong>single quotes</strong> (<code>'Movie'</code>); numbers don't. Common operators: <code>=</code>, <code>&lt;&gt;</code> (not equal), <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code>.`,
+    task:`Return the <code>title</code> and <code>type</code> for every row where the <code>type</code> is exactly <code>'Movie'</code>.`,
+    starter:`SELECT title, type\nFROM titles\nWHERE ;`,
+    solution:`SELECT title, type FROM titles WHERE type = 'Movie';`, order:false },
+  { tag:'AND · OR · NOT', emoji:'❌', title:'AND, OR, NOT',
+    concept:`Combine conditions in <code>WHERE</code>:<br>• <code>AND</code> — every condition must be true.<br>• <code>OR</code> — at least one must be true.<br>• <code>NOT</code> — flips a condition.<br><br>When you mix them, wrap <code>OR</code> groups in parentheses so the logic is unambiguous.`,
+    task:`Return the <code>title</code> of every row that is a <code>'Series'</code> <strong>and</strong> has a <code>maturity_rating</code> of <code>'TV-MA'</code>.`,
+    starter:`SELECT title\nFROM titles\nWHERE  AND ;`,
+    solution:`SELECT title FROM titles WHERE type='Series' AND maturity_rating='TV-MA';`, order:false },
+  { tag:'BETWEEN', emoji:'🖖', title:'SQL BETWEEN',
+    concept:`<code>BETWEEN a AND b</code> matches a range, and it's <strong>inclusive</strong> of both ends. It works on numbers and dates. It's just shorthand for <code>x &gt;= a AND x &lt;= b</code>.`,
+    task:`Return the <code>title</code> and <code>release_year</code> for titles released <strong>between 2018 and 2020</strong> (inclusive).`,
+    starter:`SELECT title, release_year\nFROM titles\nWHERE release_year BETWEEN  AND ;`,
+    solution:`SELECT title, release_year FROM titles WHERE release_year BETWEEN 2018 AND 2020;`, order:false },
+  { tag:'IN', emoji:'🔎', title:'SQL IN',
+    concept:`<code>IN (...)</code> checks whether a value matches any item in a list. It's the clean way to avoid chaining a pile of <code>OR</code>s. <code>country IN ('Spain','France')</code> beats writing two separate equals.`,
+    task:`Return the <code>title</code> and <code>country</code> for titles from <code>'Spain'</code>, <code>'France'</code>, or <code>'South Korea'</code> — using <code>IN</code>.`,
+    starter:`SELECT title, country\nFROM titles\nWHERE country IN ();`,
+    solution:`SELECT title, country FROM titles WHERE country IN ('Spain','France','South Korea');`, order:false },
+  { tag:'LIKE', emoji:'❤️', title:'SQL LIKE (wildcards)',
+    concept:`<code>LIKE</code> matches text patterns using wildcards:<br>• <code>%</code> — any number of characters (including none).<br>• <code>_</code> — exactly one character.<br><br><code>'The %'</code> matches anything starting with "The ". <code>'%Game'</code> matches anything ending in "Game".`,
+    task:`Return the <code>title</code> of every row whose title <strong>starts with "The "</strong>. Use <code>LIKE</code> with a <code>%</code> wildcard.`,
+    starter:`SELECT title\nFROM titles\nWHERE title LIKE '';`,
+    solution:`SELECT title FROM titles WHERE title LIKE 'The %';`, order:false },
+  { tag:'FILTERING REVIEW', emoji:'🔁', title:'Filtering review',
+    concept:`Now stack what you've learned. Real filters often combine an equality, a numeric comparison, and a "not this" — all in one <code>WHERE</code>. Read the task carefully and translate each phrase into a condition joined by <code>AND</code>.`,
+    task:`Return <code>title</code>, <code>genre</code>, and <code>imdb_score</code> for <code>'Movie'</code> rows with an <code>imdb_score</code> of <strong>7 or higher</strong> that are <strong>not</strong> in the <code>'Action'</code> genre.`,
+    starter:`SELECT title, genre, imdb_score\nFROM titles\nWHERE ;`,
+    solution:`SELECT title, genre, imdb_score FROM titles WHERE type='Movie' AND imdb_score >= 7 AND genre <> 'Action';`, order:false },
+  { tag:'ORDER BY', emoji:'↕️', title:'SQL ORDER BY',
+    concept:`<code>ORDER BY</code> sorts the result. Add <code>ASC</code> for ascending (the default) or <code>DESC</code> for descending. It always comes <strong>after</strong> <code>WHERE</code>.<br><br>Here, <strong>order matters</strong> for the check — the rows must come back in the exact sequence asked.`,
+    task:`Return <code>title</code> and <code>views_millions</code> for every <code>'Series'</code>, sorted by <code>views_millions</code> from <strong>highest to lowest</strong>.`,
+    starter:`SELECT title, views_millions\nFROM titles\nWHERE type='Series'\nORDER BY  ;`,
+    solution:`SELECT title, views_millions FROM titles WHERE type='Series' ORDER BY views_millions DESC;`, order:true }
+];
+
+const INTERMEDIATE = [
+  { tag:'INTERMEDIATE', emoji:'😎', title:'Intermediate SQL',
+    concept:`Basic SQL pulls and filters rows. Intermediate SQL <strong>summarizes</strong> them (aggregates), <strong>groups</strong> them, does math, handles missing values, branches with logic, and <strong>combines tables</strong>.<br><br>You now have a second table, <code>plays</code> — one row per streaming session, linked to <code>titles</code> by <code>title_id</code>. Warm up below.`,
+    task:`Return a single number: the total count of rows in the <code>plays</code> table, using <code>COUNT(*)</code>.`,
+    starter:`SELECT COUNT(*)\nFROM plays;`,
+    solution:`SELECT COUNT(*) FROM plays;`, order:false },
+  { tag:'SUM · AVG · COUNT', emoji:'⚙️', title:'Aggregate functions',
+    concept:`Aggregates crush many rows into one value. <code>COUNT()</code> counts rows, <code>SUM()</code> adds, <code>AVG()</code> averages, <code>MIN()</code>/<code>MAX()</code> find extremes.<br><br>One catch: <code>COUNT(*)</code> counts every row, but <code>SUM</code>, <code>AVG</code>, and <code>COUNT(column)</code> all <strong>skip NULLs</strong>.`,
+    task:`In one row, return the total minutes watched as <code>total_minutes</code> (<code>SUM</code>), the average as <code>avg_minutes</code> (<code>AVG</code>), and the number of plays as <code>play_count</code> (<code>COUNT(*)</code>).`,
+    starter:`SELECT\n  SUM(minutes_watched)   AS total_minutes,\n  AVG(minutes_watched)   AS avg_minutes,\n  COUNT(*)               AS play_count\nFROM plays;`,
+    solution:`SELECT SUM(minutes_watched) AS total_minutes, AVG(minutes_watched) AS avg_minutes, COUNT(*) AS play_count FROM plays;`, order:false },
+  { tag:'GROUP BY', emoji:'📊', title:'SQL GROUP BY',
+    concept:`<code>GROUP BY</code> runs an aggregate <strong>per group</strong> instead of over the whole table. You list the grouping column(s) in both <code>SELECT</code> and <code>GROUP BY</code>, and put the aggregate alongside.<br><br>Rule of thumb: every non-aggregated column in <code>SELECT</code> must appear in <code>GROUP BY</code>.`,
+    task:`For each <code>country</code>, return the <code>country</code> and the number of plays as <code>plays</code>. Group by country.`,
+    starter:`SELECT country, COUNT(*) AS plays\nFROM plays\nGROUP BY ;`,
+    solution:`SELECT country, COUNT(*) AS plays FROM plays GROUP BY country;`, order:false },
+  { tag:'HAVING', emoji:'🤏', title:'SQL HAVING',
+    concept:`<code>WHERE</code> filters <strong>rows</strong> before grouping; <code>HAVING</code> filters <strong>groups</strong> after aggregating. You can't put an aggregate in <code>WHERE</code> — that's exactly the job <code>HAVING</code> exists for.<br><br>Order of clauses: <code>WHERE</code> → <code>GROUP BY</code> → <code>HAVING</code>.`,
+    task:`Return each <code>country</code> and its play count as <code>plays</code>, but only for countries with <strong>more than 3</strong> plays.`,
+    starter:`SELECT country, COUNT(*) AS plays\nFROM plays\nGROUP BY country\nHAVING ;`,
+    solution:`SELECT country, COUNT(*) AS plays FROM plays GROUP BY country HAVING COUNT(*) > 3;`, order:false },
+  { tag:'DISTINCT', emoji:'⭐', title:'COUNT DISTINCT',
+    concept:`You met <code>SELECT DISTINCT</code> in Basic. Combine it with <code>COUNT</code> to answer "how many <em>unique</em> values?" — <code>COUNT(DISTINCT column)</code>. This is one of the most common interview building blocks.`,
+    task:`Return the number of <strong>distinct countries</strong> that appear in <code>plays</code>, as <code>distinct_countries</code>.`,
+    starter:`SELECT COUNT(DISTINCT country) AS distinct_countries\nFROM plays;`,
+    solution:`SELECT COUNT(DISTINCT country) AS distinct_countries FROM plays;`, order:false },
+  { tag:'ARITHMETIC', emoji:'🔢', title:'SQL arithmetic',
+    concept:`You can do math right inside <code>SELECT</code> with <code>+ - * /</code>, and it computes per row. Multiplication and division bind tighter than addition and subtraction — use parentheses when in doubt.`,
+    task:`Each session has a 5-minute intro you want to subtract. Return <code>id</code>, <code>minutes_watched</code>, and <code>minutes_watched - 5</code> as <code>adjusted</code> for every play.`,
+    starter:`SELECT id, minutes_watched, \nFROM plays;`,
+    solution:`SELECT id, minutes_watched, minutes_watched - 5 AS adjusted FROM plays;`, order:false },
+  { tag:'MATH FUNCTIONS', emoji:'📈', title:'Math functions',
+    concept:`Beyond operators, SQL ships math functions: <code>ROUND(x, n)</code> rounds to <code>n</code> decimals, <code>ABS(x)</code> absolute value, <code>CEIL</code>/<code>FLOOR</code> round up/down. They wrap around values or aggregates.`,
+    task:`Return the average minutes watched, <strong>rounded to 1 decimal place</strong>, as <code>avg_rounded</code>. Wrap <code>AVG()</code> in <code>ROUND()</code>.`,
+    starter:`SELECT ROUND(  ,  ) AS avg_rounded\nFROM plays;`,
+    solution:`SELECT ROUND(AVG(minutes_watched),1) AS avg_rounded FROM plays;`, order:false },
+  { tag:'DIVISION', emoji:'➗', title:'SQL division',
+    concept:`Watch out: when you divide two <strong>integers</strong>, SQL throws away the remainder. <code>118 / 60</code> is <code>1</code>, not <code>1.97</code>. To get decimals, make one side a float: <code>x / 60.0</code> or <code>x * 1.0 / 60</code>.<br><br>(Dividing by zero returns <code>NULL</code> here — guard it with <code>NULLIF(denominator, 0)</code> in real queries.)`,
+    task:`Using <strong>integer division</strong>, return <code>id</code> and the number of whole hours each session covers as <code>whole_hours</code> — that's <code>minutes_watched / 60</code>.`,
+    starter:`SELECT id, minutes_watched / 60 AS whole_hours\nFROM plays;`,
+    solution:`SELECT id, minutes_watched / 60 AS whole_hours FROM plays;`, order:false },
+  { tag:'NULL', emoji:'🚫', title:'SQL NULL',
+    concept:`<code>NULL</code> means "unknown," not zero or empty. You can't test it with <code>=</code> — use <code>IS NULL</code> / <code>IS NOT NULL</code>. To substitute a fallback, use <code>COALESCE(value, fallback)</code>, which returns the first non-NULL argument.`,
+    task:`Some sessions have no <code>device</code> recorded. Return <code>id</code> and <code>COALESCE(device, 'Unknown')</code> as <code>device</code> for every play, so blanks read as 'Unknown'.`,
+    starter:`SELECT id, COALESCE(device, '') AS device\nFROM plays;`,
+    solution:`SELECT id, COALESCE(device,'Unknown') AS device FROM plays;`, order:false },
+  { tag:'CASE', emoji:'💼', title:'SQL CASE',
+    concept:`<code>CASE</code> is if/else inside a query. It checks <code>WHEN</code> conditions top-to-bottom and returns the first match's <code>THEN</code>; <code>ELSE</code> catches the rest. Great for bucketing values into labels.<br><br><code>CASE WHEN ... THEN ... WHEN ... THEN ... ELSE ... END</code>`,
+    task:`Return <code>id</code>, <code>minutes_watched</code>, and a <code>CASE</code> labeled <code>length_band</code>: <code>'Long'</code> when minutes ≥ 90, <code>'Medium'</code> when ≥ 45, else <code>'Short'</code>.`,
+    starter:`SELECT id, minutes_watched,\n  CASE\n    WHEN minutes_watched >= 90 THEN 'Long'\n    WHEN  THEN 'Medium'\n    ELSE 'Short'\n  END AS length_band\nFROM plays;`,
+    solution:`SELECT id, minutes_watched, CASE WHEN minutes_watched >= 90 THEN 'Long' WHEN minutes_watched >= 45 THEN 'Medium' ELSE 'Short' END AS length_band FROM plays;`, order:false },
+  { tag:'JOINS', emoji:'🤝', title:'SQL JOINS',
+    concept:`A <code>JOIN</code> stitches rows from two tables on a matching key. <code>INNER JOIN</code> (just <code>JOIN</code>) keeps only rows that match in both. Use table aliases (<code>plays p</code>, <code>titles t</code>) and qualify columns like <code>t.title</code>.<br><br><code>FROM plays p JOIN titles t ON p.title_id = t.id</code>`,
+    task:`Join <code>plays</code> to <code>titles</code> so the names are readable. Return <code>p.id</code>, <code>t.title</code>, and <code>p.minutes_watched</code>, matching on <code>p.title_id = t.id</code>.`,
+    starter:`SELECT p.id, t.title, p.minutes_watched\nFROM plays p\nJOIN titles t ON ;`,
+    solution:`SELECT p.id, t.title, p.minutes_watched FROM plays p JOIN titles t ON p.title_id = t.id;`, order:false },
+  { tag:'DATE FUNCTIONS', emoji:'📅', title:'Date functions',
+    concept:`Dates are stored as text like <code>'2024-03-15'</code>. In SQLite, <code>strftime('%Y', col)</code> pulls the year, <code>'%m'</code> the month, <code>'%d'</code> the day — each returned as a zero-padded string (March is <code>'03'</code>).<br><br>(Other engines use <code>EXTRACT(MONTH FROM col)</code> or <code>DATE_PART</code> — same idea.)`,
+    task:`Return <code>id</code>, <code>played_on</code>, and the month as <code>strftime('%m', played_on)</code> AS <code>month</code>, but only for sessions that happened in <strong>March</strong> (month <code>'03'</code>).`,
+    starter:`SELECT id, played_on, strftime('%m', played_on) AS month\nFROM plays\nWHERE  = '03';`,
+    solution:`SELECT id, played_on, strftime('%m', played_on) AS month FROM plays WHERE strftime('%m', played_on) = '03';`, order:false }
+];
+
+const ADVANCED = [
+  { tag:'ADVANCED', emoji:'🥵', title:'Advanced SQL',
+    concept:`Advanced SQL is about <strong>analytical</strong> queries: comparing a row to its group, ranking, looking forward and backward in time, reshaping tables, and structuring complex logic so it stays readable.<br><br>Most of it builds on the <strong>subquery</strong> — a query nested inside another. Warm up with one below: a filter that compares each row to a value computed from the whole table.`,
+    task:`Return <code>title</code> and <code>imdb_score</code> for titles scoring <strong>above the overall average</strong> <code>imdb_score</code>. Use a subquery: <code>(SELECT AVG(imdb_score) FROM titles)</code>.`,
+    starter:`SELECT title, imdb_score\nFROM titles\nWHERE imdb_score > ( );`,
+    solution:`SELECT title, imdb_score FROM titles WHERE imdb_score > (SELECT AVG(imdb_score) FROM titles);`, order:false },
+  { tag:'CTE vs SUBQUERY', emoji:'🥊', title:'CTE vs. subquery',
+    concept:`A <strong>CTE</strong> (Common Table Expression) is a named, readable subquery defined up front with <code>WITH name AS (...)</code>, then referenced like a table. It does the same work as a nested subquery but reads top-to-bottom instead of inside-out — easier to follow and reuse.`,
+    task:`Build a CTE named <code>genre_avg</code> holding each <code>genre</code> and its average score as <code>avg_score</code>. Then select <code>genre</code> and <code>avg_score</code> for genres whose average is <strong>above 8</strong>.`,
+    starter:`WITH genre_avg AS (\n  SELECT genre, AVG(imdb_score) AS avg_score\n  FROM titles\n  GROUP BY genre\n)\nSELECT genre, avg_score\nFROM genre_avg\nWHERE ;`,
+    solution:`WITH genre_avg AS (SELECT genre, AVG(imdb_score) AS avg_score FROM titles GROUP BY genre) SELECT genre, avg_score FROM genre_avg WHERE avg_score > 8;`, order:false },
+  { tag:'WINDOW FUNCTION', emoji:'🪟', title:'Aggregate window functions',
+    concept:`A window function runs an aggregate <strong>without collapsing rows</strong>. <code>OVER (PARTITION BY col)</code> defines the window — each row keeps its detail <em>and</em> gets the group-level number beside it. Unlike <code>GROUP BY</code>, you still see every original row.`,
+    task:`For every play, return <code>id</code>, <code>country</code>, <code>minutes_watched</code>, and the average minutes for that play's country as <code>country_avg</code>, using <code>AVG(minutes_watched) OVER (PARTITION BY country)</code>.`,
+    starter:`SELECT id, country, minutes_watched,\n  AVG(minutes_watched) OVER (PARTITION BY country) AS country_avg\nFROM plays;`,
+    solution:`SELECT id, country, minutes_watched, AVG(minutes_watched) OVER (PARTITION BY country) AS country_avg FROM plays;`, order:false },
+  { tag:'RANKING', emoji:'🥇', title:'RANK · DENSE_RANK · ROW_NUMBER',
+    concept:`Three ranking windows, all over an <code>ORDER BY</code>:<br>• <code>ROW_NUMBER()</code> — always unique 1,2,3 (ties broken arbitrarily).<br>• <code>RANK()</code> — ties share a rank, then it <em>skips</em> (1,1,3).<br>• <code>DENSE_RANK()</code> — ties share, <em>no</em> skip (1,1,2).`,
+    task:`Rank every title by <code>views_millions</code>, highest first. Return <code>title</code>, <code>views_millions</code>, and <code>RANK() OVER (ORDER BY views_millions DESC)</code> as <code>views_rank</code>.`,
+    starter:`SELECT title, views_millions,\n  RANK() OVER (ORDER BY  ) AS views_rank\nFROM titles;`,
+    solution:`SELECT title, views_millions, RANK() OVER (ORDER BY views_millions DESC) AS views_rank FROM titles;`, order:false },
+  { tag:'LEAD · LAG', emoji:'🐢', title:'Time-series: LEAD & LAG',
+    concept:`<code>LAG(col)</code> reaches to the <strong>previous</strong> row in the window; <code>LEAD(col)</code> reaches to the <strong>next</strong>. Order the window by time and you can compare each event to the one before it — the backbone of growth, retention, and gap analysis.`,
+    task:`Look at Glass Onion's sessions (<code>title_id = 7</code>), ordered by <code>played_on</code>. Return <code>id</code>, <code>played_on</code>, <code>minutes_watched</code>, and the prior session's minutes as <code>prev_minutes</code> using <code>LAG(minutes_watched) OVER (ORDER BY played_on)</code>.`,
+    starter:`SELECT id, played_on, minutes_watched,\n  LAG(minutes_watched) OVER (ORDER BY played_on) AS prev_minutes\nFROM plays\nWHERE title_id = 7;`,
+    solution:`SELECT id, played_on, minutes_watched, LAG(minutes_watched) OVER (ORDER BY played_on) AS prev_minutes FROM plays WHERE title_id = 7;`, order:false },
+  { tag:'SELF-JOIN', emoji:'🤝', title:'SQL self-joins',
+    concept:`A self-join joins a table to <strong>itself</strong> using two aliases, to relate rows within the same table — finding pairs, hierarchies, or comparisons. The trick to avoid duplicate/mirror pairs is a condition like <code>a.id &lt; b.id</code>.`,
+    task:`Find pairs of titles that share a <code>genre</code>. Return <code>a.title</code> as <code>title_a</code>, <code>b.title</code> as <code>title_b</code>, and <code>a.genre</code>, joining <code>titles a</code> to <code>titles b</code> on equal genre with <code>a.id &lt; b.id</code>.`,
+    starter:`SELECT a.title AS title_a, b.title AS title_b, a.genre\nFROM titles a\nJOIN titles b ON a.genre = b.genre AND ;`,
+    solution:`SELECT a.title AS title_a, b.title AS title_b, a.genre FROM titles a JOIN titles b ON a.genre = b.genre AND a.id < b.id;`, order:false },
+  { tag:'UNION', emoji:'🙏', title:'UNION · INTERSECT · EXCEPT',
+    concept:`Set operators stack the results of two queries that have matching columns:<br>• <code>UNION</code> — all rows from both, duplicates removed (<code>UNION ALL</code> keeps them).<br>• <code>INTERSECT</code> — only rows in both.<br>• <code>EXCEPT</code> — rows in the first but not the second.`,
+    task:`Return one deduplicated column of every <code>country</code> that appears in <strong>either</strong> <code>titles</code> or <code>plays</code>, using <code>UNION</code>.`,
+    starter:`SELECT country FROM titles\nUNION\nSELECT country FROM plays;`,
+    solution:`SELECT country FROM titles UNION SELECT country FROM plays;`, order:false },
+  { tag:'CLEAN SQL', emoji:'🧼', title:'Write clean SQL',
+    concept:`Readable SQL ages well: keywords on their own lines, meaningful aliases, explicit column lists instead of <code>SELECT *</code>, and aggregates given clear names. The query below is a small refactor — write it the way you'd want a teammate to find it in review.`,
+    task:`Return each <code>genre</code> and its number of titles as <code>title_count</code>, ordered by <code>title_count</code> <strong>descending</strong>, then <code>genre</code> ascending to break ties.`,
+    starter:`SELECT genre, COUNT(*) AS title_count\nFROM titles\nGROUP BY genre\nORDER BY  ;`,
+    solution:`SELECT genre, COUNT(*) AS title_count FROM titles GROUP BY genre ORDER BY title_count DESC, genre;`, order:true },
+  { tag:'EXECUTION ORDER', emoji:'↕️', title:'Query order of execution',
+    concept:`SQL is written <code>SELECT … FROM … WHERE …</code> but <strong>runs</strong> in a different order: <code>FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY</code>. That's why a column alias created in <code>SELECT</code> can't be used in <code>WHERE</code> — <code>WHERE</code> already ran. Filter on the raw column instead.`,
+    task:`Return <code>title</code> and <code>views_millions / 100.0</code> as <code>hundreds</code> for titles with <code>views_millions</code> over 200. Filter on the <strong>raw column</strong> in <code>WHERE</code>, not the alias.`,
+    starter:`SELECT title, views_millions / 100.0 AS hundreds\nFROM titles\nWHERE ;`,
+    solution:`SELECT title, views_millions/100.0 AS hundreds FROM titles WHERE views_millions > 200;`, order:false },
+  { tag:'PIVOTING', emoji:'🔨', title:'SQL pivoting',
+    concept:`Pivoting turns rows into columns. The portable pattern is <code>SUM(CASE WHEN … THEN 1 ELSE 0 END)</code> per target value, wrapped in a <code>GROUP BY</code> — one output row per group, one column per category you're counting.`,
+    task:`Pivot device usage by country. Return <code>country</code>, the count of <code>'TV'</code> plays as <code>tv_plays</code>, and the count of <code>'Mobile'</code> plays as <code>mobile_plays</code>, using <code>SUM(CASE WHEN …)</code> grouped by country.`,
+    starter:`SELECT country,\n  SUM(CASE WHEN device='TV' THEN 1 ELSE 0 END)     AS tv_plays,\n  SUM(CASE WHEN device='Mobile' THEN 1 ELSE 0 END) AS mobile_plays\nFROM plays\nGROUP BY country;`,
+    solution:`SELECT country, SUM(CASE WHEN device='TV' THEN 1 ELSE 0 END) AS tv_plays, SUM(CASE WHEN device='Mobile' THEN 1 ELSE 0 END) AS mobile_plays FROM plays GROUP BY country;`, order:false },
+  { tag:'STRING FUNCTIONS', emoji:'🔤', title:'String functions',
+    concept:`Text tools you'll reach for constantly: <code>UPPER()</code>/<code>LOWER()</code> change case, <code>LENGTH()</code> counts characters, <code>SUBSTR(s, start, len)</code> slices, <code>TRIM()</code> strips whitespace, and <code>||</code> concatenates (<code>first || ' ' || last</code>).`,
+    task:`Return <code>title</code>, the title in upper case as <code>title_upper</code> (<code>UPPER()</code>), and its character count as <code>name_len</code> (<code>LENGTH()</code>).`,
+    starter:`SELECT title,\n  UPPER(title)  AS title_upper,\n  LENGTH(title) AS name_len\nFROM titles;`,
+    solution:`SELECT title, UPPER(title) AS title_upper, LENGTH(title) AS name_len FROM titles;`, order:false },
+  { tag:'CASE STUDY', emoji:'🥕', title:'Analytics case study',
+    concept:`Capstone. Real analyst questions stack the pieces: join the fact table to its dimension, aggregate per entity, filter the groups, round for presentation, and order the result. Build the whole thing in one query.`,
+    task:`Join <code>plays</code> to <code>titles</code>. For each <code>t.title</code>, return the session count as <code>sessions</code> (<code>COUNT(*)</code>) and average minutes as <code>avg_minutes</code> (rounded to 1 dp). Keep only titles with <strong>2 or more</strong> sessions, ordered by <code>sessions</code> descending, then <code>title</code>.`,
+    starter:`SELECT t.title,\n  COUNT(*) AS sessions,\n  ROUND(AVG(p.minutes_watched), 1) AS avg_minutes\nFROM plays p\nJOIN titles t ON p.title_id = t.id\nGROUP BY t.title\nHAVING \nORDER BY sessions DESC, t.title;`,
+    solution:`SELECT t.title, COUNT(*) AS sessions, ROUND(AVG(p.minutes_watched),1) AS avg_minutes FROM plays p JOIN titles t ON p.title_id = t.id GROUP BY t.title HAVING COUNT(*) >= 2 ORDER BY sessions DESC, t.title;`, order:true }
+];
+
+const ADVANCEDPLUS = [
+  { tag:'INTERVIEW PREP', emoji:'🔥', title:'FAANG-tier prep',
+    concept:`This tab is built like a real entertainment-analytics interview: subscription, cross-company engagement, and A/B-test tables, with the patterns Netflix, Spotify, Disney+, Max and the games studios actually run. You'll use three new tables — <code>members</code> (subscriptions), <code>streams</code> (cross-medium engagement), and <code>experiments</code> (A/B tests).<br><br><strong>Engine note:</strong> this runs on SQLite. Where your Snowflake/BigQuery target differs (e.g. <code>QUALIFY</code>, <code>DATEDIFF</code>), I'll flag it — the concept transfers, the syntax shifts.<br><br>Warm up with a <strong>correlated subquery</strong>: a subquery that references the outer row, re-evaluated per row.`,
+    task:`Find above-average-priced subscribers <em>within their own service</em>. Return <code>member_id</code>, <code>service</code>, <code>monthly_price</code> for members whose <code>monthly_price</code> exceeds the average price of their <strong>own</strong> service. The subquery must reference the outer row's service.`,
+    starter:`SELECT member_id, service, monthly_price\nFROM members m\nWHERE monthly_price > (\n  SELECT AVG(monthly_price) FROM members m2\n  WHERE m2.service = \n);`,
+    solution:`SELECT member_id, service, monthly_price FROM members m WHERE monthly_price > (SELECT AVG(monthly_price) FROM members m2 WHERE m2.service = m.service);`, order:false },
+  { tag:'EXISTS', emoji:'👻', title:'EXISTS & NOT EXISTS',
+    concept:`<code>EXISTS</code> tests whether a related row exists and stops at the first hit — efficient. <code>NOT EXISTS</code> is the standard <strong>anti-join</strong>: rows in A with no match in B. It's how teams flag dormant subscribers, never-streamed signups, and churn risk before a renewal.`,
+    task:`Find <strong>dormant members</strong> — those with no row at all in <code>streams</code>. Return <code>member_id</code> and <code>service</code> using <code>NOT EXISTS</code>.`,
+    starter:`SELECT member_id, service\nFROM members m\nWHERE NOT EXISTS (\n  SELECT 1 FROM streams s WHERE s.member_id = \n);`,
+    solution:`SELECT member_id, service FROM members m WHERE NOT EXISTS (SELECT 1 FROM streams s WHERE s.member_id = m.member_id);`, order:false },
+  { tag:'RUNNING TOTAL', emoji:'🌊', title:'Window frames: running total',
+    concept:`A window <strong>frame</strong> controls which rows feed the aggregate. <code>OVER (ORDER BY d ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)</code> makes a <strong>cumulative</strong> running total — the bread and butter of "minutes streamed to date" and cumulative-revenue dashboards.<br><br>You'll first roll <code>streams</code> up to a daily total in a CTE, then run the frame over it.`,
+    task:`For <code>company = 'Netflix'</code>, build a daily series (<code>stream_date</code>, <code>daily_minutes</code>) then add a cumulative <code>cumulative_minutes</code> using <code>SUM(daily_minutes) OVER (ORDER BY stream_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)</code>.`,
+    starter:`WITH daily AS (\n  SELECT stream_date, SUM(minutes) AS daily_minutes\n  FROM streams WHERE company='Netflix'\n  GROUP BY stream_date\n)\nSELECT stream_date, daily_minutes,\n  SUM(daily_minutes) OVER (ORDER BY stream_date ROWS BETWEEN  ) AS cumulative_minutes\nFROM daily;`,
+    solution:`WITH daily AS (SELECT stream_date, SUM(minutes) AS daily_minutes FROM streams WHERE company='Netflix' GROUP BY stream_date) SELECT stream_date, daily_minutes, SUM(daily_minutes) OVER (ORDER BY stream_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_minutes FROM daily;`, order:true },
+  { tag:'MOVING AVERAGE', emoji:'📉', title:'Window frames: moving average',
+    concept:`Shrink the frame to a sliding window and you get a <strong>moving average</strong> — the standard way to smooth noisy daily engagement. <code>ROWS BETWEEN 2 PRECEDING AND CURRENT ROW</code> averages today plus the prior two days (a 3-day trailing mean).`,
+    task:`On the same Netflix daily series, return <code>stream_date</code>, <code>daily_minutes</code>, and a <strong>3-day trailing average</strong> as <code>moving_avg</code> using <code>AVG(...) OVER (ORDER BY stream_date ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)</code>.`,
+    starter:`WITH daily AS (\n  SELECT stream_date, SUM(minutes) AS daily_minutes\n  FROM streams WHERE company='Netflix'\n  GROUP BY stream_date\n)\nSELECT stream_date, daily_minutes,\n  AVG(daily_minutes) OVER (ORDER BY stream_date ROWS BETWEEN  ) AS moving_avg\nFROM daily;`,
+    solution:`WITH daily AS (SELECT stream_date, SUM(minutes) AS daily_minutes FROM streams WHERE company='Netflix' GROUP BY stream_date) SELECT stream_date, daily_minutes, AVG(daily_minutes) OVER (ORDER BY stream_date ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS moving_avg FROM daily;`, order:true },
+  { tag:'TOP-N / QUALIFY', emoji:'🏆', title:'Top-N per group (QUALIFY)',
+    concept:`The most common analytics pattern: the <strong>top row per group</strong> — top title per company, per country, per month. You number rows within each group with <code>ROW_NUMBER() OVER (PARTITION BY … ORDER BY … )</code>, then keep <code>= 1</code>.<br><br>On <strong>Snowflake/BigQuery/Databricks</strong> you'd filter the window directly with <code>QUALIFY ROW_NUMBER() OVER (...) = 1</code> — no subquery. SQLite has no <code>QUALIFY</code>, so here you <strong>wrap it in a subquery</strong> and filter <code>rn = 1</code>. Same result, portable syntax.`,
+    task:`Find each company's single most-watched stream. Number rows per company by <code>minutes DESC, item</code>, then keep rank 1. Return <code>company</code>, <code>item</code>, <code>minutes</code>.`,
+    starter:`SELECT company, item, minutes\nFROM (\n  SELECT company, item, minutes,\n    ROW_NUMBER() OVER (PARTITION BY  ORDER BY  ) AS rn\n  FROM streams\n) t\nWHERE rn = 1;`,
+    solution:`SELECT company, item, minutes FROM (SELECT company, item, minutes, ROW_NUMBER() OVER (PARTITION BY company ORDER BY minutes DESC, item) AS rn FROM streams) t WHERE rn=1;`, order:false },
+  { tag:'NTILE', emoji:'📊', title:'NTILE & percentiles',
+    concept:`<code>NTILE(n)</code> splits ordered rows into <code>n</code> roughly equal buckets — quartiles (4), deciles (10) — for segmenting users by spend or engagement. Relatives: <code>PERCENT_RANK()</code> and <code>CUME_DIST()</code> give a row's percentile position.<br><br>(True median needs <code>PERCENTILE_CONT</code> in Snowflake/Postgres; SQLite lacks it, so NTILE/percent_rank are the portable tools.)`,
+    task:`Segment subscribers into 4 spend tiers by price. Return <code>member_id</code>, <code>monthly_price</code>, and <code>NTILE(4) OVER (ORDER BY monthly_price DESC, member_id)</code> as <code>spend_quartile</code> (tier 1 = priciest).`,
+    starter:`SELECT member_id, monthly_price,\n  NTILE(4) OVER (ORDER BY  ) AS spend_quartile\nFROM members;`,
+    solution:`SELECT member_id, monthly_price, NTILE(4) OVER (ORDER BY monthly_price DESC, member_id) AS spend_quartile FROM members;`, order:false },
+  { tag:'FILTER', emoji:'🧮', title:'Conditional aggregation (FILTER)',
+    concept:`<code>aggregate(...) FILTER (WHERE cond)</code> aggregates only the rows meeting a condition — cleaner than <code>SUM(CASE WHEN … THEN 1 ELSE 0 END)</code> and perfect for one-pass "total vs completed", funnel counts, or conditional sums.<br><br>(Snowflake/Postgres/SQLite support <code>FILTER</code>; SQL Server still needs the <code>CASE</code> form.)`,
+    task:`Per company, return total streams as <code>total_streams</code> and completed streams as <code>completed_streams</code>, using <code>COUNT(*) FILTER (WHERE completed = 1)</code>. Group by company.`,
+    starter:`SELECT company,\n  COUNT(*) AS total_streams,\n  COUNT(*) FILTER (WHERE  ) AS completed_streams\nFROM streams\nGROUP BY company;`,
+    solution:`SELECT company, COUNT(*) AS total_streams, COUNT(*) FILTER (WHERE completed=1) AS completed_streams FROM streams GROUP BY company;`, order:false },
+  { tag:'GAPS & ISLANDS', emoji:'🏝️', title:'Gaps & islands (streaks)',
+    concept:`The classic hard interview question: find runs of <strong>consecutive days</strong> — login streaks, binge streaks, daily-active runs. The trick: order the dates, number them, and subtract. For a run of consecutive days, <code>date − row_number</code> is <strong>constant</strong>, so it becomes a group key. Count per key; the max is the longest streak.`,
+    task:`Find member 1's longest streak of consecutive days with a Netflix stream. Use <code>julianday(stream_date) − ROW_NUMBER() OVER (ORDER BY stream_date)</code> as the island key, count per island, and return the max as <code>longest_streak</code>.`,
+    starter:`WITH d AS (\n  SELECT DISTINCT stream_date FROM streams\n  WHERE member_id=1 AND company='Netflix'\n),\nr AS (\n  SELECT stream_date,\n    julianday(stream_date) - ROW_NUMBER() OVER (ORDER BY stream_date) AS grp\n  FROM d\n)\nSELECT MAX(streak) AS longest_streak FROM (\n  SELECT grp, COUNT(*) AS streak FROM r GROUP BY \n);`,
+    solution:`WITH d AS (SELECT DISTINCT stream_date FROM streams WHERE member_id=1 AND company='Netflix'), r AS (SELECT stream_date, julianday(stream_date)-ROW_NUMBER() OVER (ORDER BY stream_date) AS grp FROM d), g AS (SELECT grp, COUNT(*) AS streak FROM r GROUP BY grp) SELECT MAX(streak) AS longest_streak FROM g;`, order:false },
+  { tag:'COHORT', emoji:'🪜', title:'Cohort retention',
+    concept:`Cohort analysis groups members by <strong>signup month</strong>, then tracks how many survive to a later point — the core of every retention dashboard. A member is active at a date if they signed up on/before it and hadn't cancelled by it. Combine a date bucket with conditional counting.`,
+    task:`Build signup-month cohorts. Return <code>cohort_month</code> (year-month of <code>signup_date</code>), the <code>cohort_size</code>, and how many were <strong>still active on 2024-03-31</strong> as <code>active_end_march</code> (signed up by then and not cancelled by then). Use <code>FILTER</code>.`,
+    starter:`SELECT strftime('%Y-%m', signup_date) AS cohort_month,\n  COUNT(*) AS cohort_size,\n  COUNT(*) FILTER (WHERE signup_date <= '2024-03-31'\n    AND (cancel_date IS NULL OR cancel_date > '2024-03-31')) AS active_end_march\nFROM members\nGROUP BY cohort_month;`,
+    solution:`SELECT strftime('%Y-%m',signup_date) AS cohort_month, COUNT(*) AS cohort_size, COUNT(*) FILTER (WHERE signup_date<='2024-03-31' AND (cancel_date IS NULL OR cancel_date>'2024-03-31')) AS active_end_march FROM members GROUP BY cohort_month;`, order:false },
+  { tag:'A/B TEST', emoji:'🧪', title:'A/B test analysis',
+    concept:`Netflix runs thousands of concurrent A/B tests through its experimentation platform (ABlaze / XP), assigning members to a <strong>control</strong> or <strong>treatment</strong> cell and measuring conversion plus quality-of-experience metrics like <strong>play delay</strong> (ms to start playback). The first analyst step is always per-cell rates.`,
+    task:`Analyze the <code>'faster_start'</code> test. Per <code>cell</code>, return the cell, member count as <code>members</code>, conversion rate as <code>conv_rate</code> (<code>AVG(converted)</code>), and average QoE as <code>avg_play_delay</code> (<code>AVG(play_delay_ms)</code>). Filter to <code>test_name='faster_start'</code>.`,
+    starter:`SELECT cell,\n  COUNT(*) AS members,\n  AVG(converted) AS conv_rate,\n  AVG(play_delay_ms) AS avg_play_delay\nFROM experiments\nWHERE test_name = \nGROUP BY cell;`,
+    solution:`SELECT cell, COUNT(*) AS members, AVG(converted) AS conv_rate, AVG(play_delay_ms) AS avg_play_delay FROM experiments WHERE test_name='faster_start' GROUP BY cell;`, order:false },
+  { tag:'DATE MATH', emoji:'⏱️', title:'Date arithmetic & tenure',
+    concept:`Tenure, recency, and time-to-event all come from date differences. SQLite uses <code>julianday(a) − julianday(b)</code> for a day count; <strong>Snowflake/BigQuery</strong> use <code>DATEDIFF</code> / <code>DATE_DIFF</code>, and Postgres subtracts dates directly. Same concept, different function name.`,
+    task:`For cancelled members, compute days subscribed. Return <code>member_id</code>, <code>signup_date</code>, <code>cancel_date</code>, and <code>tenure_days</code> = <code>CAST(julianday(cancel_date) − julianday(signup_date) AS INT)</code>. Only cancelled members, ordered by <code>tenure_days</code> descending (tie-break by member_id).`,
+    starter:`SELECT member_id, signup_date, cancel_date,\n  CAST(julianday(cancel_date) - julianday(signup_date) AS INT) AS tenure_days\nFROM members\nWHERE \nORDER BY tenure_days DESC, member_id;`,
+    solution:`SELECT member_id, signup_date, cancel_date, CAST(julianday(cancel_date)-julianday(signup_date) AS INT) AS tenure_days FROM members WHERE cancel_date IS NOT NULL ORDER BY tenure_days DESC, member_id;`, order:true },
+  { tag:'RECURSIVE CTE', emoji:'🔁', title:'Recursive CTE: date spine',
+    concept:`<code>WITH RECURSIVE</code> lets a CTE reference itself — for hierarchies (org charts, comment threads) or generating sequences. A common analytics use is a <strong>date spine</strong>: a complete row-per-day calendar you left-join engagement onto, so days with zero activity still appear (no gaps in the chart).`,
+    task:`Generate a date spine for the first week of April 2024. Using a recursive CTE, return one column <code>d</code> with the 7 dates from <code>'2024-04-01'</code> through <code>'2024-04-07'</code>. Step with <code>date(d, '+1 day')</code>.`,
+    starter:`WITH RECURSIVE dates(d) AS (\n  SELECT '2024-04-01'\n  UNION ALL\n  SELECT date(d, '+1 day') FROM dates WHERE d < \n)\nSELECT d FROM dates;`,
+    solution:`WITH RECURSIVE dates(d) AS (SELECT '2024-04-01' UNION ALL SELECT date(d,'+1 day') FROM dates WHERE d<'2024-04-07') SELECT d FROM dates;`, order:false },
+  { tag:'DEDUP', emoji:'🧹', title:'Deduplicate: latest per key',
+    concept:`Event tables and slowly-changing dimensions accumulate duplicates; analysts constantly need the <strong>single latest record per entity</strong>. Pattern: <code>ROW_NUMBER() OVER (PARTITION BY key ORDER BY recency DESC)</code>, keep <code>= 1</code>. (Snowflake: <code>QUALIFY ROW_NUMBER() … = 1</code>.) A clean tie-breaker in the <code>ORDER BY</code> makes it deterministic.`,
+    task:`Get each member's <strong>most recent</strong> stream. Partition by <code>member_id</code>, order by <code>stream_date DESC, stream_id DESC</code>, keep rank 1. Return <code>member_id</code>, <code>stream_date</code>, <code>item</code>.`,
+    starter:`SELECT member_id, stream_date, item\nFROM (\n  SELECT member_id, stream_date, item,\n    ROW_NUMBER() OVER (PARTITION BY  ORDER BY  ) AS rn\n  FROM streams\n)\nWHERE rn = 1;`,
+    solution:`SELECT member_id, stream_date, item FROM (SELECT member_id, stream_date, item, ROW_NUMBER() OVER (PARTITION BY member_id ORDER BY stream_date DESC, stream_id DESC) AS rn FROM streams) WHERE rn=1;`, order:false },
+  { tag:'CAPSTONE', emoji:'🥇', title:'Capstone: engagement leaderboard',
+    concept:`Stack it all. Real "title health" / "power user" questions chain a CTE, a rank, a running-total frame, and a window-total ratio in one query. Here you'll build a Netflix engagement leaderboard with each member's cumulative share of total minutes — exactly the shape of a Pareto / concentration analysis.`,
+    task:`For <code>company='Netflix'</code>: per member compute <code>total_minutes</code>, then return <code>member_id</code>, <code>total_minutes</code>, <code>eng_rank</code> (<code>RANK()</code> over minutes desc), and <code>cumulative_pct</code> = running sum of minutes ÷ grand total × 100, rounded to 1 dp. Order by <code>eng_rank</code>.`,
+    starter:`WITH m AS (\n  SELECT member_id, SUM(minutes) AS total_minutes\n  FROM streams WHERE company='Netflix'\n  GROUP BY member_id\n)\nSELECT member_id, total_minutes,\n  RANK() OVER (ORDER BY total_minutes DESC) AS eng_rank,\n  ROUND(100.0 * SUM(total_minutes) OVER (ORDER BY total_minutes DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)\n    / SUM(total_minutes) OVER (), 1) AS cumulative_pct\nFROM m\nORDER BY eng_rank;`,
+    solution:`WITH m AS (SELECT member_id, SUM(minutes) AS total_minutes FROM streams WHERE company='Netflix' GROUP BY member_id) SELECT member_id, total_minutes, RANK() OVER (ORDER BY total_minutes DESC) AS eng_rank, ROUND(100.0*SUM(total_minutes) OVER (ORDER BY total_minutes DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)/SUM(total_minutes) OVER (),1) AS cumulative_pct FROM m ORDER BY eng_rank;`, order:true },
+  { tag:'INTERVIEW', emoji:'🧠', title:'Interview gauntlet: churn',
+    concept:`Final rep — stated like a take-home prompt with no scaffolding in the query. This is the single most common entertainment-analytics question: <strong>cohort churn rate</strong>. You own the translation from business question to SQL.`,
+    task:`<em>Prompt:</em> "For each signup-month cohort, what share of members churned within our data window?" Return <code>cohort_month</code>, <code>cohort_size</code>, <code>churned</code> (members with a non-null <code>cancel_date</code>), and <code>churn_rate</code> as a percentage rounded to 1 dp. Order by <code>cohort_month</code>.`,
+    starter:`-- translate the prompt into SQL\nSELECT \nFROM members\nGROUP BY cohort_month\nORDER BY cohort_month;`,
+    solution:`SELECT strftime('%Y-%m',signup_date) AS cohort_month, COUNT(*) AS cohort_size, COUNT(*) FILTER (WHERE cancel_date IS NOT NULL) AS churned, ROUND(100.0*COUNT(*) FILTER (WHERE cancel_date IS NOT NULL)/COUNT(*),1) AS churn_rate FROM members GROUP BY cohort_month ORDER BY cohort_month;`, order:true }
+];
+
+const SCHEMAS = {
+  titles:[['id','int'],['title','text'],['type','text'],['genre','text'],['release_year','int'],['maturity_rating','text'],['imdb_score','real'],['views_millions','int'],['country','text']],
+  plays:[['id','int'],['title_id','int → titles.id'],['played_on','date'],['country','text'],['minutes_watched','int'],['device','text'],['completed','0/1']],
+  members:[['member_id','int'],['signup_date','date'],['service','text'],['country','text'],['plan','text'],['monthly_price','real'],['cancel_date','date / NULL']],
+  streams:[['stream_id','int'],['member_id','int → members'],['stream_date','date'],['company','text'],['medium','text'],['item','text'],['minutes','int'],['completed','0/1']],
+  experiments:[['assignment_id','int'],['member_id','int → members'],['test_name','text'],['cell','control/treatment'],['converted','0/1'],['play_delay_ms','int'],['retained','0/1']]
+};
+
+const SECTIONS = [
+  { label:'Basic SQL', lessons:BASIC, tables:['titles'] },
+  { label:'Intermediate SQL', lessons:INTERMEDIATE, tables:['titles','plays'] },
+  { label:'Advanced SQL', lessons:ADVANCED, tables:['titles','plays'] },
+  { label:'Expert · FAANG', lessons:ADVANCEDPLUS, tables:['members','streams','experiments'] }
+];
+
+function renderSchema(){
+  const host=document.getElementById('schemaHost');
+  host.innerHTML='';
+  SECTIONS[sec].tables.forEach(t=>{
+    const d=document.createElement('div'); d.className='schema';
+    let h=`<span class="tname">table <b>${t}</b></span>`;
+    SCHEMAS[t].forEach(([c,ty])=>h+=`<span class="col">${c}<span class="ty">${ty}</span></span>`);
+    d.innerHTML=h; host.appendChild(d);
+  });
+}
+
+/* ================= state ================= */
+let db=null, sec=0, current=0;
+const userCode = SECTIONS.map(s=>s.lessons.map(l=>l.starter));
+const done     = SECTIONS.map(s=>s.lessons.map(()=>false));
+
+/* ================= boot ================= */
+initSqlJs({ locateFile:f=>'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/'+f })
+  .then(SQL=>{
+    db=new SQL.Database(); db.run(SEED);
+    document.getElementById('boot').classList.add('hide');
+    buildTabs(); buildSpine(); load(0);
+  })
+  .catch(err=>{
+    document.getElementById('boot').innerHTML='<div style="text-align:center;max-width:340px">Could not load the SQL engine.<br><span style="font-size:11px;color:#988cab">Check your network connection and reload — the engine loads from cdnjs.cloudflare.com.</span></div>';
+    console.error(err);
+  });
+
+/* ================= query + compare ================= */
+function runSQL(sql){
+  const res=db.exec(sql);
+  if(res.length===0) return {cols:[],rows:[]};
+  return {cols:res[0].columns, rows:res[0].values};
+}
+function norm(v){return v===null?'∅':String(v);}
+function rowsEqual(a,b,ordered){
+  if(a.length!==b.length) return false;
+  const A=a.map(r=>r.map(norm).join('\u0001'));
+  const B=b.map(r=>r.map(norm).join('\u0001'));
+  if(ordered) return A.every((x,i)=>x===B[i]);
+  A.sort(); B.sort();
+  return A.every((x,i)=>x===B[i]);
+}
+
+/* ================= tabs ================= */
+function buildTabs(){
+  const host=document.getElementById('tabs');
+  SECTIONS.forEach((s,i)=>{
+    const b=document.createElement('button');
+    b.className='tab'+(i===sec?' active':'');
+    b.innerHTML=`${s.label}<span class="pill">${s.lessons.length}</span>`;
+    b.onclick=()=>switchSection(i);
+    host.appendChild(b);
+  });
+}
+function refreshTabs(){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===sec));
+}
+function switchSection(i){
+  if(i===sec) return;
+  saveCode(); sec=i; current=0;
+  refreshTabs(); buildSpine(); load(0);
+}
+
+/* ================= spine ================= */
+function buildSpine(){
+  const spine=document.getElementById('spine');
+  spine.innerHTML='<div class="eyebrow">'+SECTIONS[sec].label+'</div>';
+  SECTIONS[sec].lessons.forEach((l,i)=>{
+    const n=document.createElement('div');
+    n.className='node'; n.dataset.i=i;
+    n.innerHTML=`<span class="dot">${String(i+1).padStart(2,'0')}</span>
+      <span><span class="nm">${l.title}</span><span class="tag">${l.tag}</span></span>`;
+    n.onclick=()=>load(i);
+    spine.appendChild(n);
+  });
+}
+function refreshSpine(){
+  document.querySelectorAll('.node').forEach((n,i)=>{
+    n.classList.toggle('active', i===current);
+    n.classList.toggle('done', done[sec][i]);
+  });
+  const total=SECTIONS[sec].lessons.length;
+  const count=done[sec].filter(Boolean).length;
+  document.getElementById('progText').textContent=`${SECTIONS[sec].label.split(' ')[0]} · ${count} / ${total}`;
+  document.getElementById('progFill').style.width=(count/total*100)+'%';
+}
+
+/* ================= load lesson ================= */
+function load(i){
+  saveCode(); current=i;
+  const l=SECTIONS[sec].lessons[i];
+  document.getElementById('lEyebrow').innerHTML=
+    `<span>${SECTIONS[sec].label} · ${String(i+1).padStart(2,'0')} / ${l.tag}</span><span>${l.emoji}</span>`;
+  document.getElementById('lTitle').textContent=l.title;
+  document.getElementById('lConcept').innerHTML=l.concept;
+  document.getElementById('lTask').innerHTML=l.task;
+  document.getElementById('editor').value=userCode[sec][i];
+  renderSchema();
+  setStatus('idle','›','Write a query and Run it, or hit Check to grade the task.');
+  document.getElementById('gridHost').innerHTML='';
+  document.getElementById('prevBtn').disabled=(i===0);
+  document.getElementById('nextBtn').disabled=(i===SECTIONS[sec].lessons.length-1);
+  refreshSpine();
+  document.getElementById('editor').focus();
+}
+function saveCode(){ if(current!=null) userCode[sec][current]=document.getElementById('editor').value; }
+
+/* ================= status + grid ================= */
+function setStatus(kind,ic,text){
+  const s=document.getElementById('status');
+  s.className='status '+kind;
+  s.querySelector('.ic').textContent=ic;
+  document.getElementById('statusText').innerHTML=text;
+}
+function renderGrid(cols,rows){
+  const host=document.getElementById('gridHost');
+  if(cols.length===0){host.innerHTML='';return;}
+  let h='<div class="grid-scroll"><table><thead><tr>';
+  cols.forEach(c=>h+=`<th>${c}</th>`);
+  h+='</tr></thead><tbody>';
+  rows.forEach(r=>{
+    h+='<tr class="rowfade">';
+    r.forEach(v=>{
+      const num=(typeof v==='number');
+      h+=`<td class="${num?'num':''}">${v===null?'<span style="color:#6c6280">NULL</span>':v}</td>`;
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';
+  host.innerHTML=h;
+}
+
+/* ================= actions ================= */
+function doRun(){
+  saveCode();
+  const sql=document.getElementById('editor').value.trim();
+  if(!sql){setStatus('warn','!','The editor is empty. Type a query first.');return;}
+  try{
+    const {cols,rows}=runSQL(sql);
+    renderGrid(cols,rows);
+    setStatus('ok','✓',`Query ran. <b>${rows.length}</b> row${rows.length===1?'':'s'} returned.`);
+  }catch(e){
+    document.getElementById('gridHost').innerHTML='';
+    setStatus('err','✕',`SQLite error: ${escapeHtml(e.message)}`);
+  }
+}
+function doCheck(){
+  saveCode();
+  const l=SECTIONS[sec].lessons[current];
+  const sql=document.getElementById('editor').value.trim();
+  if(!sql){setStatus('warn','!','Type your query, then Check.');return;}
+  let actual;
+  try{actual=runSQL(sql);}
+  catch(e){
+    document.getElementById('gridHost').innerHTML='';
+    setStatus('err','✕',`Your query didn't run — fix this first: ${escapeHtml(e.message)}`);
+    return;
+  }
+  renderGrid(actual.cols, actual.rows);
+  const expected=runSQL(l.solution);
+  if(rowsEqual(actual.rows, expected.rows, l.order)){
+    const wasNew=!done[sec][current];
+    done[sec][current]=true; refreshSpine();
+    const c=document.querySelector('.console'); c.classList.add('pulse');
+    setTimeout(()=>c.classList.remove('pulse'),600);
+    const last=SECTIONS[sec].lessons.length-1;
+    let extra='';
+    if(current<last) extra=` Next up: <b>${SECTIONS[sec].lessons[current+1].tag}</b> →`;
+    else if(sec<SECTIONS.length-1) extra=` ${SECTIONS[sec].label} complete — switch to the <b>${SECTIONS[sec+1].label}</b> tab. 🎉`;
+    else extra=` Expert tier cleared — correlated subqueries, window frames, gaps-and-islands, cohorts and A/B analysis. Interview-ready. 🎉`;
+    setStatus('ok','✓',`Correct! Result matches the expected output.${wasNew?extra:''}`);
+  }else{
+    let msg=`Not quite. Your result has <b>${actual.rows.length}</b> row${actual.rows.length===1?'':'s'}; the answer expects <b>${expected.rows.length}</b>.`;
+    if(l.order && actual.rows.length===expected.rows.length) msg+=` Rows look close — check your <b>sort order</b> (ASC vs DESC).`;
+    else msg+=` Re-read the task and check your columns, aggregates, and conditions.`;
+    setStatus('err','✕',msg);
+  }
+}
+function escapeHtml(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+/* ================= wiring ================= */
+document.getElementById('runBtn').onclick=doRun;
+document.getElementById('checkBtn').onclick=doCheck;
+document.getElementById('resetBtn').onclick=()=>{document.getElementById('editor').value=SECTIONS[sec].lessons[current].starter;document.getElementById('editor').focus();};
+document.getElementById('solBtn').onclick=()=>{
+  document.getElementById('editor').value=SECTIONS[sec].lessons[current].solution;
+  setStatus('warn','i','Solution loaded into the editor. Read it, then Run to see it work — Check still counts it.');
+};
+document.getElementById('prevBtn').onclick=()=>{if(current>0)load(current-1);};
+document.getElementById('nextBtn').onclick=()=>{if(current<SECTIONS[sec].lessons.length-1)load(current+1);};
+
+const ed=document.getElementById('editor');
+ed.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();doRun();}
+  if(e.key==='Tab'){
+    e.preventDefault();
+    const s=ed.selectionStart,en=ed.selectionEnd;
+    ed.value=ed.value.slice(0,s)+'  '+ed.value.slice(en);
+    ed.selectionStart=ed.selectionEnd=s+2;
+  }
+});
+</script>
+</body>
+</html>
