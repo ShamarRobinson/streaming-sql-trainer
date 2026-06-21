@@ -18,7 +18,7 @@ No backend, no signup, no install. A full SQLite engine runs in the browser thro
 
 ## Why I built this
 
-I am a senior analyst with roughly seven years in financial reporting and contract administration across major entertainment companies, now moving into data analytics with a focus on media, streaming, and content performance. Rather than grind anonymous practice problems, I built the practice tool I wanted: one that runs real SQL, grades it fairly, and frames every concept in the language of the industry I am targeting. The result doubles as a portfolio piece that shows three things at once: SQL depth across all four difficulty tiers, front-end engineering (a self-contained app with an embedded database), and domain fluency in entertainment analytics.
+I am a senior analyst with an entertainment background in finance, contract administration, and business & legal affairs across major entertainment studios, now moving into data analytics with a focus on media, streaming, and content performance. Rather than grind anonymous practice problems, I built the practice tool I wanted: one that runs real SQL, grades it fairly, and frames every concept in the language of the industry I am targeting. The result doubles as a portfolio piece that shows three things at once: SQL depth across all four difficulty tiers, front-end engineering (a self-contained app with an embedded database), and domain fluency in entertainment analytics.
 
 ## What it does
 
