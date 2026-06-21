@@ -6,13 +6,13 @@ A live, in-browser SQL learning environment where you write real queries against
 
 No backend, no signup, no install. A full SQLite engine runs in the browser through WebAssembly, so when you press **Run**, your SQL executes against a real database, and when you press **Check**, your answer is graded by comparing result sets (any correct phrasing passes, not just one exact string).
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-Open_App-39d3bb?style=for-the-badge)](https://YOUR-USERNAME.github.io/streaming-sql-trainer/)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Open_App-39d3bb?style=for-the-badge)](https://ShamarRobinson.github.io/streaming-sql-trainer/)
 &nbsp;
 ![SQLite in WASM](https://img.shields.io/badge/engine-SQLite_via_WebAssembly-b07ee8?style=flat-square)
 ![No dependencies](https://img.shields.io/badge/build-zero_dependencies-f5b454?style=flat-square)
 ![License: MIT](https://img.shields.io/badge/license-MIT-988cab?style=flat-square)
 
-> **Live demo:** https://YOUR-USERNAME.github.io/streaming-sql-trainer/
+> **Live demo:** https://ShamarRobinson.github.io/streaming-sql-trainer/
 
 ---
 
@@ -91,8 +91,7 @@ An internet connection is required the first time you open it, so the browser ca
 
 **Shamar** — senior analyst transitioning into data analytics for media, streaming, and entertainment. Background in financial reporting and contract administration at Warner Bros. Discovery, Disney, and Legendary Entertainment, plus an MBA in arts, entertainment, and media management. Targeting data analyst and reporting analyst roles focused on content performance, subscriber and revenue analytics, and production finance.
 
-- LinkedIn: `[add your LinkedIn URL]`
-- Portfolio / contact: `[add your link]`
+- LinkedIn: `https://www.linkedin.com/in/shamarrobinson`
 
 ## License
 
