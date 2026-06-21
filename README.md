@@ -13,6 +13,9 @@ No backend, no signup, no install. A full SQLite engine runs in the browser thro
 ![License: MIT](https://img.shields.io/badge/license-MIT-988cab?style=flat-square)
 
 > **Live demo:** https://shamarrobinson.github.io/streaming-sql-trainer/
+> ![Streaming SQL Trainer in action](screenshot.png)
+
+*Writing a real query in the Expert tier and having it graded against a live SQLite database, entirely in the browser.*
 
 ---
 
