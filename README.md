@@ -6,13 +6,13 @@ A live, in-browser SQL learning environment where you write real queries against
 
 No backend, no signup, no install. A full SQLite engine runs in the browser through WebAssembly, so when you press **Run**, your SQL executes against a real database, and when you press **Check**, your answer is graded by comparing result sets (any correct phrasing passes, not just one exact string).
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-Open_App-39d3bb?style=for-the-badge)](https://ShamarRobinson.github.io/streaming-sql-trainer/)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Open_App-39d3bb?style=for-the-badge)](https://shamarrobinson.github.io/streaming-sql-trainer/)
 &nbsp;
 ![SQLite in WASM](https://img.shields.io/badge/engine-SQLite_via_WebAssembly-b07ee8?style=flat-square)
 ![No dependencies](https://img.shields.io/badge/build-zero_dependencies-f5b454?style=flat-square)
 ![License: MIT](https://img.shields.io/badge/license-MIT-988cab?style=flat-square)
 
-> **Live demo:** https://ShamarRobinson.github.io/streaming-sql-trainer/
+> **Live demo:** https://shamarrobinson.github.io/streaming-sql-trainer/
 
 ---
 
